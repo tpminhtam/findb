@@ -1,0 +1,29 @@
+[project]
+name = "finance-brain"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=1.13.0",
+    "duckdb>=1.5.6",
+    "fastapi>=0.143.0",
+    "hydradb-sdk>=2,<3",
+    "networkx>=3.7",
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.6",
+    "python-dotenv>=1.2.4",
+    "python-multipart>=0.0.32",
+    "rank-bm25>=0.2.2",
+    "requests>=2.34.2",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

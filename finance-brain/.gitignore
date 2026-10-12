@@ -1,0 +1,6 @@
+.env
+out/
+uploads/
+.venv/
+__pycache__/
+*.duckdb

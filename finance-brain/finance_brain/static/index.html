@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>finDB</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+<script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+<script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<style>
+:root{--page:#f9f9f7;--surface:#fff;--surface-2:#f3f3f0;--line:#e6e5df;--ink:#0b0b0b;--ink-2:#52514e;--muted:#898781;
+  --rail:#0f1b2d;--rail-2:#16253d;--rail-line:#22324e;--rail-ink:#e8edf5;--rail-muted:#8ea0bd;
+  --blue:#2a78d6;--blue-3:#cde2fb;--orange:#eb6834;--aqua:#1baf7a;--violet:#6250d6;--magenta:#e87ba4;
+  --warning:#fab219;--serious:#ec835a;--critical:#d03b3b;--good:#0ca30c;
+  --radius:14px;--shadow:0 1px 2px rgba(11,11,11,.04),0 6px 18px rgba(11,11,11,.05)}
+*{box-sizing:border-box}[hidden]{display:none!important}html,body{height:100%}
+body{margin:0;font:14px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--page);font-feature-settings:"tnum" 1}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:12px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:10px;transition:background .15s}
+button:hover{background:var(--surface-2)}button:disabled{opacity:.5;cursor:default}
+button.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}button.primary:hover{background:#256abf}
+button.ghost,a.ghost{background:transparent;border:1px solid transparent;color:var(--ink-2);padding:8px 12px;border-radius:10px;text-decoration:none;font-size:13px}button.ghost:hover,a.ghost:hover{background:var(--surface-2)}
+button.link{border:none;background:none;color:var(--ink-2);padding:6px 0;font-size:13px}button.link:hover{color:var(--ink);background:none}
+input[type=text],textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:var(--surface);color:var(--ink);outline:none}
+input[type=text]:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-3)}textarea{resize:none}
+.app{display:grid;grid-template-columns:250px 1fr;height:100vh}
+/* rail */
+.rail{background:var(--rail);color:var(--rail-ink);display:flex;flex-direction:column;padding:18px 14px;gap:14px;min-height:0;overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:0 4px 4px}.brand h1{font-size:17px;margin:0;font-weight:700;letter-spacing:-.01em;line-height:1.15}.brand p{margin:1px 0 0;font-size:11.5px;color:var(--rail-muted)}
+.mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#2a78d6,#6250d6);display:grid;place-items:center;flex:none}
+.drop{border:1.5px dashed #3b4f74;border-radius:12px;padding:20px 10px;text-align:center;color:var(--rail-ink);cursor:pointer;font-weight:500;transition:background .15s,border-color .15s}
+.drop:hover,.drop.over{border-color:#6ea0f5;background:var(--rail-2)}.drop svg{display:block;margin:0 auto 6px;opacity:.8}
+.links{display:flex;gap:14px;justify-content:center;font-size:12.5px}.links a{color:var(--rail-muted);cursor:pointer}.links a:hover{color:#fff}
+.sheetbox{display:flex;gap:6px}.sheetbox input{background:var(--rail-2);border-color:var(--rail-line);color:var(--rail-ink);padding:8px 10px}.sheetbox button{background:var(--rail-2);border-color:var(--rail-line);color:var(--rail-ink);padding:8px 10px}
+.wb{padding:10px 12px;border-radius:10px;cursor:pointer;position:relative;display:flex;align-items:center;gap:8px}.wb:hover{background:var(--rail-2)}.wb.active{background:#1c3154}
+.wb .name{font-weight:500;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.wb .n{min-width:18px;height:18px;border-radius:9px;background:var(--critical);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 5px}
+.wb .del{border:none;background:none;color:var(--rail-muted);padding:0 4px;font-size:15px;visibility:hidden}.wb:hover .del{visibility:visible}.wb .del:hover{color:#fff;background:none}
+/* main */
+.main{display:flex;flex-direction:column;min-height:0;min-width:0}
+.topbar{display:flex;align-items:center;padding:14px 28px;gap:12px}
+.seg{display:inline-flex;background:var(--surface-2);border-radius:12px;padding:4px;gap:2px}
+.seg button{border:none;background:transparent;color:var(--ink-2);padding:7px 16px;border-radius:9px;font-weight:500}
+.seg button.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600}
+.seg.small button{padding:5px 12px;font-size:13px}
+.chip{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2)}.chip i{width:8px;height:8px;border-radius:50%;background:var(--warning)}.chip.ok i{background:var(--good)}.chip.bad i{background:var(--critical)}
+.content{padding:8px 28px 28px;overflow:auto;flex:1;min-height:0}
+.tab{display:none}.tab.active{display:block}
+.head{display:flex;align-items:center;gap:12px;margin-bottom:6px}h2{font-size:22px;font-weight:700;letter-spacing:-.02em;margin:0}.grow{flex:1}
+.sub{color:var(--ink-2)}.hint{color:var(--muted);font-size:12.5px}
+/* tables */
+.stats{display:flex;gap:36px;margin:10px 0 22px}.stats div{display:flex;align-items:baseline;gap:8px}.stats b{font-size:30px;font-weight:700;letter-spacing:-.02em}.stats span{color:var(--ink-2)}
+.stats .go{cursor:pointer}.stats .hot b{color:var(--critical)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.tcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;cursor:pointer;box-shadow:var(--shadow);transition:transform .12s,border-color .12s}
+.tcard:hover{transform:translateY(-2px);border-color:#b7d3f6}.tcard .name{font-weight:600;font-size:15px;margin:10px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tcard .m{color:var(--ink-2);font-size:13px}
+.role{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--surface-2);color:var(--ink-2)}
+.role.data{color:#1c5cab;background:#e4effc}.role.report{color:#a8431a;background:#fde9e0}.role.dimension{color:#0f7a54;background:#dff5ec}.role.assumptions,.role.kv{color:#4a3aa7;background:#ebe8fb}.role.narrative{color:#a2456d;background:#fce7f0}
+/* issues */
+.hero{background:var(--surface);border:1px solid #f0c9c9;border-left:5px solid var(--critical);border-radius:var(--radius);padding:20px 22px;margin:14px 0;box-shadow:var(--shadow);display:flex;align-items:center;gap:16px}
+.hero .big{font-size:20px;font-weight:700;letter-spacing:-.01em}.hero .sub{margin-top:2px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.grp{border-bottom:1px solid var(--line)}.grp:last-child{border-bottom:none}
+.grp summary{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;list-style:none;font-weight:500}.grp summary::-webkit-details-marker{display:none}
+.grp summary .n{margin-left:auto;color:var(--muted);font-weight:600}.grp summary:hover{background:#fbfbf9}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--muted)}.dot.medium{background:var(--serious)}.dot.low{background:var(--warning)}.dot.high{background:var(--critical)}
+.it{display:flex;gap:14px;padding:8px 18px 8px 39px;font-size:13px;color:var(--ink-2)}.it .loc{color:var(--ink);flex:none;min-width:150px}.it .d{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cap{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;margin:26px 0 10px}
+.plan{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.plan div{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+.plan b{font-size:24px;font-weight:700;display:block;line-height:1.1}.plan span{color:var(--ink-2);font-size:13px}
+/* lineage */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.gwrap{display:flex;flex-direction:column;height:calc(100vh - 150px);border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+.gstage{position:relative;flex:1;min-height:0}#cy{position:absolute;inset:0}.gempty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted)}
+.gcard{border-top:1px solid var(--line);padding:14px 18px;max-height:34%;overflow:auto}
+.gcard .ct{font-weight:700;font-size:15px}.gcard p{margin:4px 0 0;color:var(--ink-2);font-size:13.5px;max-width:900px}.gcard .f{color:var(--ink-2);margin-top:4px;word-break:break-all}
+.glegend{position:absolute;left:16px;bottom:12px;font-size:12px;color:var(--muted)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chips button{border-radius:999px;padding:4px 11px;font-size:12.5px}
+/* ask */
+.chat{display:flex;flex-direction:column;gap:14px;max-width:820px;margin:0 auto;padding-bottom:12px}
+.sugg{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:60px 0 0}.sugg button{border-radius:999px;color:var(--ink-2)}
+.msg{display:flex;gap:12px}.msg.user{justify-content:flex-end}
+.bubble{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 18px;box-shadow:var(--shadow);max-width:680px;font-size:15px;line-height:1.55}
+.msg.user .bubble{background:#0f1b2d;color:#fff;border-color:#0f1b2d;box-shadow:none}
+.bubble p{margin:0 0 8px}.bubble p:last-child{margin-bottom:0}.bubble ul,.bubble ol{margin:6px 0 2px;padding-left:20px}.bubble li{margin:4px 0}
+.cite{display:inline-grid;place-items:center;min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--surface-2);color:var(--ink-2);font-size:10.5px;font-weight:600;margin-left:3px;vertical-align:2px;cursor:help}
+.srcd{margin-top:10px;font-size:12.5px;color:var(--muted)}.srcd summary{cursor:pointer}.srcd ol{margin:8px 0 0;padding-left:20px;color:var(--ink-2)}.srcd li{margin:5px 0}
+.composer{position:sticky;bottom:0;max-width:820px;margin:0 auto;background:linear-gradient(transparent,var(--page) 22%);padding-top:18px}
+.cbox{display:flex;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:8px 8px 8px 16px;box-shadow:var(--shadow);align-items:center}
+.cbox textarea{border:none;padding:8px 0;height:40px;box-shadow:none!important;font-size:15px}.teach{display:flex;gap:8px;margin-top:8px}
+/* sql + modal */
+.sqlbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px;box-shadow:var(--shadow)}.sqlbox textarea{border:none;box-shadow:none!important;height:70px}
+table.data{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}table.data th,table.data td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;white-space:nowrap}
+table.data th{color:var(--muted);font-weight:600;font-size:12px}table.data td.num{text-align:right}
+.modal{position:fixed;inset:0;background:rgba(11,20,35,.45);display:none;align-items:flex-start;justify-content:center;padding:48px 20px;z-index:30}
+.modal.open{display:flex}.modal .box{background:var(--surface);border-radius:18px;max-width:860px;width:100%;max-height:84vh;overflow:auto;padding:26px 28px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.cols{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 4px}.col{border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:12.5px}.col i{color:var(--muted);font-style:normal;margin-left:6px}
+pre{background:var(--surface-2);padding:12px;border-radius:10px;overflow:auto;font-size:12px;font-family:"JetBrains Mono",monospace;margin:8px 0 0}
+.empty{text-align:center;margin-top:16vh}.empty h2{font-size:28px;margin-bottom:8px}.empty p{color:var(--ink-2);margin:0 0 20px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,10px);background:#0f1b2d;color:#fff;padding:10px 16px;border-radius:12px;font-size:13px;opacity:0;transition:opacity .2s,transform .2s;z-index:40;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}.toast.err{background:var(--critical)}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid var(--blue-3);border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}@keyframes sp{to{transform:rotate(360deg)}}
+/* intro: the name types in the centre, then flies to the sidebar corner while the dark panel collapses into the sidebar */
+#intro{position:fixed;inset:0;z-index:100;cursor:pointer}
+#introBg{position:absolute;inset:0;background:var(--rail);transition:clip-path .9s cubic-bezier(.7,0,.2,1),opacity .4s ease}
+#introWord{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:0 0;color:#fff;font-weight:700;font-size:clamp(64px,9vw,128px);letter-spacing:-.01em;line-height:1.15;white-space:nowrap;will-change:transform}
+#introWord.fly{transition:transform .9s cubic-bezier(.7,0,.2,1)}
+#introCaret{display:inline-block;width:.07em;height:.86em;background:#6ea0f5;margin-left:.07em;vertical-align:-.08em;border-radius:2px;animation:introBlink .85s steps(1) infinite}
+@keyframes introBlink{50%{opacity:0}}
+.brand .mark,.brand p{transition:opacity .6s ease}
+body.intro .brand h1{visibility:hidden}body.intro .brand .mark,body.intro .brand p{opacity:0}
+</style>
+</head>
+<body class="intro">
+<div id="intro"><div id="introBg"></div><div id="introWord"><span id="introText"></span><i id="introCaret"></i></div></div>
+<div class="app">
+<aside class="rail">
+  <div class="brand"><div class="mark"><svg width="17" height="17" viewBox="0 0 20 20" fill="none"><rect x="2" y="2" width="7" height="7" rx="1.5" fill="#fff"/><rect x="11" y="2" width="7" height="7" rx="1.5" fill="#fff" opacity=".6"/><rect x="2" y="11" width="7" height="7" rx="1.5" fill="#fff" opacity=".6"/><circle cx="14.5" cy="14.5" r="3.5" fill="#fff"/></svg></div><div><h1>finDB</h1><p>Your Finance Org Brain</p></div></div>
+  <div class="drop" id="drop"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Drop a spreadsheet<input type="file" id="file" accept=".xlsx,.xlsm" hidden></div>
+  <div class="links"><a id="lnkSheet">Add a Google Sheet</a></div>
+  <div class="sheetbox" id="sheetBox" hidden><input type="text" id="gsheet" placeholder="Paste a link"><button id="btnSheet">Add</button></div>
+  <div id="wbList"></div>
+</aside>
+<section class="main">
+  <div class="topbar">
+    <nav class="seg" id="tabs"><button data-tab="tables" class="active">Tables</button><button data-tab="lineage">Lineage</button><button data-tab="issues">Issues</button><button data-tab="ask">Ask</button><button data-tab="sql">SQL</button></nav>
+    <span class="chip" id="chipStore"><i></i><span>…</span></span>
+  </div>
+  <div class="content">
+    <div class="tab active" id="tab-tables"><div id="tables"></div></div>
+    <div class="tab" id="tab-lineage">
+      <div class="toolbar"><input type="text" id="gsearch" list="nodeList" placeholder="Trace a number…" style="max-width:320px"><datalist id="nodeList"></datalist>
+        <nav class="seg small" id="dirSeg" hidden><button data-dir="up" class="active">Comes from</button><button data-dir="down">Feeds</button></nav>
+        <button class="ghost" id="btnAll" hidden>← All tables</button><span class="grow"></span><button class="ghost" id="btnFit">Fit</button></div>
+      <div class="gwrap"><div class="gstage"><div id="cy"></div><div class="gempty" id="gempty" hidden>No formulas link tables here.</div><div class="glegend" id="glegend">━ feeds &nbsp;&nbsp; ┅ shares a key</div></div><div class="gcard" id="gcard" hidden></div></div>
+    </div>
+    <div class="tab" id="tab-issues"><div id="issues"></div></div>
+    <div class="tab" id="tab-ask">
+      <div class="chat" id="chat"><div class="sugg" id="sugg"></div></div>
+      <div class="composer"><div class="cbox"><textarea id="q" placeholder="Ask about your numbers…"></textarea><button class="primary" id="btnAsk">Ask</button></div>
+        <button class="link" id="lnkTeach">+ Teach the brain</button>
+        <div class="teach" id="teach" hidden><input type="text" id="mem" placeholder="e.g. Maya Chen owns the BvA file"><button id="btnMem">Save</button></div></div>
+    </div>
+    <div class="tab" id="tab-sql">
+      <div class="sqlbox"><textarea id="sql" class="mono">select department, round(sum(amount)) as q3 from ardent_fy26_budget_vs_actuals__actuals where period >= '2026-07-01' and entity = 'US' group by 1 order by 2 desc</textarea>
+        <div style="display:flex;align-items:center;gap:10px"><button class="primary" id="btnSql">Run</button><span class="hint" id="sqlStatus"></span></div></div>
+      <div id="sqlOut" style="margin-top:14px;overflow:auto"></div>
+      <div class="cap">Tables</div><div class="chips" id="sqlTables"></div>
+    </div>
+  </div>
+</section>
+</div>
+<div class="modal" id="modal"><div class="box" id="modalBody"></div></div>
+<div class="toast" id="toast"></div>
+<script>
+(function intro(){
+  const el = document.getElementById('intro'); if (!el) return;
+  const done = () => { document.body.classList.remove('intro'); el.remove(); };
+  try {
+    // deep links (?q=, ?trace=, ?table=) and reduced-motion users go straight to the app
+    if (location.search.length > 1 || matchMedia('(prefers-reduced-motion: reduce)').matches) return done();
+    const NAME = 'finDB', word = document.getElementById('introWord'), text = document.getElementById('introText'), caret = document.getElementById('introCaret'), bg = document.getElementById('introBg');
+    let finished = false; const timers = []; const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+    const end = () => { if (finished) return; finished = true; timers.forEach(clearTimeout); done(); };
+    function fly(){ if (finished) return; caret.remove();
+      const r0 = word.getBoundingClientRect(), r1 = document.querySelector('.brand h1').getBoundingClientRect(), scale = r1.height / r0.height;
+      const rail = document.querySelector('.rail').getBoundingClientRect().width;
+      word.style.left = r0.left + 'px'; word.style.top = r0.top + 'px'; word.style.transform = 'none'; bg.style.clipPath = 'inset(0 0px 0 0)';
+      void word.offsetWidth;                              // flush layout so the next change animates (no rAF dependency)
+      word.classList.add('fly');
+      word.style.transform = `translate(${r1.left - r0.left}px, ${r1.top - r0.top}px) scale(${scale})`;
+      bg.style.clipPath = `inset(0 ${Math.max(innerWidth - rail, 0)}px 0 0)`;
+      later(() => { bg.style.opacity = 0; }, 930);      // word has landed: let the real sidebar show through
+      later(end, 930 + 420); }
+    function type(i){ if (finished) return; text.textContent = NAME.slice(0, i); if (i < NAME.length) later(() => type(i + 1), 150 + Math.random() * 90); else later(fly, 700); }
+    const fontsReady = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 900))]) : Promise.resolve();
+    fontsReady.then(() => later(() => type(1), 380));
+    el.addEventListener('click', end); document.addEventListener('keydown', end, {once: true});
+  } catch (e) { done(); }
+})();
+const $ = s => document.querySelector(s);
+const api = (p, o) => fetch(p, o).then(async r => { if (!r.ok) throw new Error((await r.json().catch(()=>({detail:r.statusText}))).detail || r.statusText); return r.json(); });
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = n => (n ?? 0).toLocaleString('en-US');
+const PERSONA = 'tam';
+const ROLE = {data:'Data', report:'Report', dimension:'Lookup', assumptions:'Inputs', narrative:'Commentary', kv:'Inputs', notes:'Notes'};
+let current = null, wbData = null, cy = null, G = null, dir = 'up', graphFor = null, graphP = null, toastT = null;
+function toast(msg, err, sticky){ const t = $('#toast'); t.innerHTML = (sticky ? '<span class="spin"></span> ' : '') + esc(msg); t.className = 'toast show' + (err ? ' err' : ''); clearTimeout(toastT); if (!sticky) toastT = setTimeout(() => t.className = 'toast', err ? 6000 : 2600); }
+const activeTab = () => document.querySelector('#tabs button.active').dataset.tab;
+function openTab(name){ if (!document.getElementById('tab-' + name)) return; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('active', x.dataset.tab === name)); document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === 'tab-' + name)); if (name === 'lineage') ensureGraph(); if (name === 'sql') loadTables(); }
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => openTab(b.dataset.tab));
+
+/* ---------- rail */
+async function refreshStatus(){ const s = await api('/api/status'); const c = $('#chipStore'); c.className = 'chip ' + (s.hydra_error ? 'bad' : s.store === 'hydradb' ? 'ok' : ''); c.title = s.hydra_error || ''; c.querySelector('span').textContent = s.store === 'hydradb' ? (s.hydra_connecting ? 'HydraDB · connecting' : s.hydra_syncing ? 'HydraDB · syncing' : 'HydraDB') : 'Local'; if (s.hydra_syncing || s.hydra_connecting) { c.className = 'chip'; setTimeout(refreshStatus, 2500); } }
+async function refreshList(){ const wbs = await api('/api/workbooks'); const el = $('#wbList');
+  if (!wbs.length) { el.innerHTML = ''; current = null; wbData = null; renderEmpty(); return; }
+  el.innerHTML = wbs.map(w => `<div class="wb ${w.slug===current?'active':''}" data-slug="${w.slug}" title="${esc(w.filename)}"><span class="name">${esc(w.filename.replace(/\.xls[xm]$/i,'').replace(/_/g,' '))}</span>${w.findings_high ? `<span class="n" title="issues to fix">${w.findings_high}</span>` : ''}<button class="del" title="Remove">×</button></div>`).join('');
+  el.querySelectorAll('.wb').forEach(d => d.onclick = e => { if (e.target.classList.contains('del')) { api('/api/workbooks/' + d.dataset.slug, {method:'DELETE'}).then(() => { if (current === d.dataset.slug) current = null; refreshAll(); }); return; } select(d.dataset.slug); });
+  if (!current) await select(wbs[0].slug); }
+async function refreshAll(){ await refreshStatus(); await refreshList(); }
+function renderEmpty(){ $('#tables').innerHTML = `<div class="empty"><h2>Drop a spreadsheet</h2><p>Get its tables, lineage and issues.</p></div>`; $('#issues').innerHTML = ''; }
+async function select(slug){ current = slug; document.querySelectorAll('.wb').forEach(d => d.classList.toggle('active', d.dataset.slug === slug));
+  wbData = await api('/api/workbooks/' + slug); renderTables(); renderIssues(); graphFor = null; if (activeTab() === 'lineage') await ensureGraph(); }
+async function doUpload(fd){ toast('Reading the workbook…', false, true); try { const r = await api('/api/upload', {method:'POST', body: fd}); toast(`${r.tables.length} tables · ${r.findings} issues`); current = r.slug; await refreshList(); await select(r.slug); openTab('tables'); refreshStatus(); } catch (e) { toast(e.message, true); } }
+$('#drop').onclick = () => $('#file').click();
+$('#file').onchange = () => { const f = $('#file').files[0]; if (!f) return; const fd = new FormData(); fd.append('file', f); doUpload(fd); };
+['dragenter','dragover'].forEach(ev => $('#drop').addEventListener(ev, e => { e.preventDefault(); $('#drop').classList.add('over'); }));
+['dragleave','drop'].forEach(ev => $('#drop').addEventListener(ev, e => { e.preventDefault(); $('#drop').classList.remove('over'); }));
+$('#drop').addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (!f) return; const fd = new FormData(); fd.append('file', f); doUpload(fd); });
+$('#lnkSheet').onclick = () => { $('#sheetBox').hidden = !$('#sheetBox').hidden; $('#gsheet').focus(); };
+$('#btnSheet').onclick = () => { const u = $('#gsheet').value.trim(); if (!u) return; const fd = new FormData(); fd.append('gsheet_url', u); doUpload(fd); };
+
+/* ---------- tables */
+function renderTables(){ const all = wbData.tables, ts = all.filter(t => t.kind === 'table'), extra = all.filter(t => t.kind !== 'table');
+  const issues = wbData.findings.filter(f => f.severity === 'high' || f.severity === 'medium').length, hot = wbData.findings.some(f => f.severity === 'high');
+  const card = t => `<div class="tcard" data-id="${esc(t.id)}"><span class="role ${t.kind==='table'?t.role:t.kind}">${ROLE[t.kind==='table'?t.role:t.kind] || t.role}</span><div class="name">${esc(t.name)}</div><div class="m">${t.kind==='table' ? `${fmt(t.n_rows)} rows · ${t.columns.length} columns` : t.kind==='kv' ? `${t.pairs.length} values` : `${t.text.length} lines`}</div></div>`;
+  $('#tables').innerHTML = `<div class="head"><h2>${esc(wbData.workbook.filename.replace(/\.xls[xm]$/i,'').replace(/_/g,' '))}</h2><span class="grow"></span><a class="ghost" href="/api/workbooks/${current}/ddl" target="_blank">Export SQL</a></div>
+    <div class="stats"><div><b>${ts.length}</b><span>tables</span></div><div><b>${fmt(wbData.scorecard.formula_cells)}</b><span>formulas</span></div><div class="go ${hot?'hot':''}" onclick="openTab('issues')"><b>${issues}</b><span>issues</span></div></div>
+    <div class="grid">${ts.map(card).join('')}</div>
+    ${extra.length ? `<button class="link" id="moreBtn" style="margin-top:14px">+ ${extra.length} notes and inputs</button><div class="grid" id="moreGrid" hidden>${extra.map(card).join('')}</div>` : ''}`;
+  $('#tables').querySelectorAll('.tcard').forEach(c => c.onclick = () => openTable(all.find(t => t.id === c.dataset.id)));
+  if ($('#moreBtn')) $('#moreBtn').onclick = () => { $('#moreGrid').hidden = !$('#moreGrid').hidden; }; }
+const typeWord = c => ({money:'money', percent:'percent', date:'date', identifier:'code', narrative:'text', integer:'number', decimal:'number', boolean:'yes/no'})[c.semantic] || 'text';
+function rowsTable(cols, rows){ return `<table class="data"><thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(v => `<td class="${typeof v==='number'?'num':''}">${typeof v === 'number' ? v.toLocaleString('en-US',{maximumFractionDigits:2}) : esc(String(v ?? '').slice(0,60))}</td>`).join('')}</tr>`).join('')}</tbody></table>`; }
+function openTable(t){ let html = `<div class="head"><h2>${esc(t.name)}</h2><span class="role ${t.kind==='table'?t.role:t.kind}">${ROLE[t.kind==='table'?t.role:t.kind]||''}</span><span class="grow"></span><button class="ghost" onclick="closeModal()">✕</button></div>`;
+  if (t.kind === 'table') { const sem = wbData.semantics?.tables?.[t.id]; const ddl = (wbData.ddl || '').split('\n\n').find(b => b.includes(`__${t.slug} (`)) || '';
+    html += `<div class="sub">${esc(t.sheet)} · ${fmt(t.n_rows)} rows</div>${sem?.description ? `<p class="sub" style="margin:10px 0 0">${esc(sem.description)}</p>` : ''}
+      <div class="cols">${t.columns.map(c => `<span class="col">${esc(c.name)}<i>${c.is_key ? 'key' : typeWord(c)}</i></span>`).join('')}</div>
+      <div style="overflow:auto;margin-top:12px">${rowsTable(t.columns.map(c => c.name), t.rows.slice(0,5))}</div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:16px"><button class="primary" id="mTrace">See lineage</button></div><details class="srcd"><summary>SQL</summary><pre>${esc(ddl.trim())}</pre></details>`; }
+  else if (t.kind === 'kv') html += `<div style="margin-top:12px">${rowsTable(['', ''], t.pairs.map(p => [p.key, p.value]))}</div>`;
+  else html += `<ul class="sub">${t.text.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+  $('#modalBody').innerHTML = html; $('#modal').classList.add('open');
+  if ($('#mTrace')) $('#mTrace').onclick = async () => { closeModal(); openTab('lineage'); await ensureGraph(); showOverview(); const n = cy && cy.getElementById(t.id); if (n && n.length) pickTable(n); }; }
+function closeModal(){ $('#modal').classList.remove('open'); }
+$('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); }; document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+/* ---------- issues */
+const KIND = {stale_range:'Rows missing from formulas', constant_in_formula:'Numbers typed inside formulas', pasted_value:'Pasted values, not linked', hidden_rows:'Hidden rows that formulas use', hidden_cols:'Hidden columns', manual_input:'Manual inputs', approximate_lookup:'Lookups without exact match', external_link:'Links to other workbooks'};
+function issueLine(f){ const loc = f.kind === 'hidden_rows' ? `${f.sheet} row ${f.location}` : f.kind === 'stale_range' ? f.sheet : `${f.sheet}!${f.location}`; let d = f.detail || '';
+  if (f.kind === 'constant_in_formula') { const m = d.match(/literal (\S+)/); d = `${m ? m[1] : ''} in ${f.count || 1} cell${(f.count || 1) > 1 ? 's' : ''}`; }
+  else if (f.kind === 'manual_input') d = d.split('; note')[0].replace(' / Value', '').replace(/referenced by (\d+) formula\(s\)/, 'used by $1 formulas');
+  else if (f.kind === 'hidden_rows') d = '';
+  else if (f.kind === 'stale_range') d = `${f.excluded_data_rows} rows missing from ${f.formulas} formulas`;
+  return `<div class="it"><span class="loc mono">${esc(loc)}</span><span class="d" title="${esc(f.detail || '')}">${esc(d)}</span></div>`; }
+function renderIssues(){ const fs = wbData.findings, order = {high:0, medium:1, low:2, info:3}; const heroes = fs.filter(f => f.severity === 'high'), rest = fs.filter(f => f.severity !== 'high');
+  const groups = {}; rest.forEach(f => (groups[f.kind] ||= {kind:f.kind, sev:f.severity, items:[]}).items.push(f)); const gl = Object.values(groups).sort((a,b) => order[a.sev] - order[b.sev]);
+  const hero = f => f.kind === 'stale_range' ? `<div class="hero"><div><div class="big">${f.excluded_data_rows} rows are missing from ${fmt(f.formulas)} formulas</div><div class="sub">Formulas read ${esc(f.sheet)} to row ${f.range_end}. The data runs to row ${f.table_end}.</div></div><span class="grow"></span><button data-q="What breaks if more rows are added to the ${esc(f.sheet)} tab?">Ask what breaks</button></div>`
+    : `<div class="hero"><div><div class="big">${esc(KIND[f.kind] || f.kind)}</div><div class="sub mono">${esc(f.sheet)}!${esc(f.location || '')}</div></div></div>`;
+  const mp = wbData.scorecard.migration_plan, plan = [['Load as tables', mp.load_as_tables], ['Rebuild as views', mp.rebuild_as_views_or_metrics], ['Keep as inputs', mp.keep_as_assumptions], ['Keep as knowledge', mp.ingest_as_knowledge]];
+  $('#issues').innerHTML = `<div class="head"><h2>${fs.length ? 'Issues' : 'No issues found'}</h2></div>${heroes.map(hero).join('')}
+    ${gl.length ? `<div class="card">${gl.map(g => `<details class="grp"><summary><i class="dot ${g.sev}" title="${g.sev}"></i>${esc(KIND[g.kind] || g.kind)}<span class="n">${g.items.length}</span></summary>${g.items.map(issueLine).join('')}<div style="height:8px"></div></details>`).join('')}</div>` : ''}
+    <div class="cap">Migration plan</div><div class="plan">${plan.map(([h, ids]) => `<div title="${esc(ids.join(', '))}"><b>${ids.length}</b><span>${h}</span></div>`).join('')}</div>`;
+  $('#issues').querySelectorAll('[data-q]').forEach(b => b.onclick = () => { openTab('ask'); send(b.dataset.q); }); }
+
+/* ---------- lineage */
+const PAL = {data:['#e4effc','#2a78d6'], report:['#fde9e0','#eb6834'], dimension:['#dff5ec','#1baf7a'], assumptions:['#ebe8fb','#6250d6'], inputs:['#ebe8fb','#6250d6'], narrative:['#fce7f0','#e87ba4'], external:['#fdecec','#e34948']};
+const TPAL = {METRIC_ROW:['#fde9e0','#eb6834'], COLUMN:['#e4effc','#2a78d6'], CELL:['#dff5ec','#1baf7a'], NAMED_RANGE:['#ebe8fb','#6250d6'], EXTERNAL_WORKBOOK:['#fdecec','#e34948']};
+const GREY = ['#f3f3f0','#898781'];
+function nlabel(d, bare){ const f = d.full || d.label || d.id;
+  if (d.type === 'METRIC_ROW') return f.split(': ').slice(1).join(': ') || f;
+  if (d.type === 'COLUMN') return bare ? (f.split('.').slice(1).join('.') || f) : f;
+  if (d.type === 'CELL') { const i = f.indexOf('!'), m = f.slice(i + 1).match(/^([A-Z]+\d+)\s*(.*?)(?: = (.*))?$/); if (!m) return f; if (m[2].includes(' key for ')) return 'Hidden key ' + m[1];
+    const lab = (m[2].split(' / ')[0] || (f.slice(0, i) + '!' + m[1])).slice(0, 34); return m[3] ? `${lab}\n= ${m[3]}` : lab; }
+  return f; }
+async function ensureGraph(){ if (!current) return; if (graphFor !== current) { graphFor = current; graphP = loadGraph(); await graphP; } else { await graphP; if (cy) { cy.resize(); fit(); } } }
+const refit = () => requestAnimationFrame(() => { if (cy) { cy.resize(); fit(); } });
+function fit(){ if (!cy) return; cy.fit(null, 40); if (cy.zoom() > 1.15) { cy.zoom(1.15); cy.center(); } }
+async function loadGraph(){ const [ov, det] = await Promise.all([api(`/api/workbooks/${current}/graph?level=table`), api(`/api/workbooks/${current}/graph`)]);
+  G = {ov: ov.elements, nodes: new Map(), inE: new Map(), outE: new Map()}; const push = (m, k, v) => { if (!m.has(k)) m.set(k, []); m.get(k).push(v); };
+  for (const el of det.elements) { const d = el.data; if (d.source) { if (d.predicate === 'LOOKS_UP' || d.predicate === 'REFERENCES') continue; push(G.inE, d.target, d); push(G.outE, d.source, d); } else G.nodes.set(d.id, d); }
+  $('#nodeList').innerHTML = [...G.nodes.values()].filter(d => (d.type === 'METRIC_ROW' || d.type === 'COLUMN') && G.inE.has(d.id)).map(d => `<option value="${esc(d.full)}">`).join('');
+  showOverview(); }
+function draw(elements, tracing){ if (cy) cy.destroy(); $('#cy').innerHTML = ''; $('#gempty').hidden = elements.length > 0; if (!elements.length) { cy = null; return; }
+  cy = cytoscape({ container: $('#cy'), elements, wheelSensitivity: .2, minZoom: .25, maxZoom: 2,
+    style: [ {selector:'node', style:{'shape':'round-rectangle','label':'data(text)','text-wrap':'wrap','text-max-width':150,'text-valign':'center','text-halign':'center','font-family':'Inter, sans-serif','font-size':12,'font-weight':500,'color':'#0b0b0b','width':'label','height':'label','padding':'11px','background-color':'data(bg)','border-width':1.5,'border-color':'data(bd)'}},
+             {selector:'node[?root]', style:{'background-color':'#0f1b2d','border-color':'#0f1b2d','color':'#ffffff','font-weight':600,'font-size':13}},
+             {selector:'edge', style:{'width':1.5,'line-color':'#c9c8c0','target-arrow-color':'#c9c8c0','target-arrow-shape':'triangle','curve-style':'bezier','arrow-scale':.9}},
+             {selector:'edge[kind="key"]', style:{'line-style':'dashed','width':1.2}},
+             {selector:'.hl', style:{'line-color':'#2a78d6','target-arrow-color':'#2a78d6','border-color':'#0b0b0b','border-width':2.5,'width':2.4}},
+             {selector:'.dim', style:{'opacity':.22}} ],
+    layout: {name:'dagre', rankDir:'LR', nodeSep:18, rankSep:90, padding:40} });
+  cy.ready(fit);
+  cy.on('tap', 'node', e => tracing ? traceNode(e.target.id()) : pickTable(e.target));
+  cy.on('tap', e => { if (e.target === cy && !tracing) { cy.elements().removeClass('hl dim'); $('#gcard').hidden = true; refit(); } }); }
+function showOverview(){ if (!G) return; $('#glegend').hidden = false; $('#dirSeg').hidden = true; $('#btnAll').hidden = true; $('#gsearch').value = ''; $('#gcard').hidden = true;
+  draw(G.ov.map(el => el.data.source ? el : {data: {...el.data, text: el.data.label, bg: (PAL[el.data.role] || GREY)[0], bd: (PAL[el.data.role] || GREY)[1]}}), false); }
+function pickTable(n){ cy.elements().addClass('dim').removeClass('hl'); n.closedNeighborhood().removeClass('dim'); n.connectedEdges().addClass('hl'); n.addClass('hl');
+  const tid = n.id(), mine = [...G.nodes.values()].filter(d => d.table === tid && (d.type === 'METRIC_ROW' || d.type === 'COLUMN'));
+  let outs = mine.filter(d => G.inE.has(d.id)), d0 = 'up'; if (!outs.length) { outs = mine.filter(d => G.outE.has(d.id)); d0 = 'down'; }
+  outs.sort((a, b) => (a.type === 'METRIC_ROW' ? 0 : 1) - (b.type === 'METRIC_ROW' ? 0 : 1));
+  $('#gcard').innerHTML = `<div class="ct">${esc(n.data('full'))}</div>${outs.length ? `<div class="hint">${d0 === 'up' ? 'Trace a number' : 'See what it feeds'}</div><div class="chips">${outs.slice(0, 14).map(d => `<button data-id="${esc(d.id)}">${esc(nlabel(d, true))}</button>`).join('')}</div>` : ''}`;
+  $('#gcard').hidden = false; refit(); $('#gcard').querySelectorAll('button').forEach(b => b.onclick = () => traceNode(b.dataset.id, d0)); }
+function traceNode(id, d0){ if (!G.nodes.has(id)) return; if (d0) dir = d0; const E = dir === 'up' ? G.inE : G.outE; let keep, edges;
+  const build = depth => { keep = new Set([id]); edges = new Map(); let fr = [id]; for (let k = 0; k < depth; k++) { const nx = []; for (const n of fr) for (const e of (E.get(n) || [])) { const o = dir === 'up' ? e.source : e.target; if (!G.nodes.has(o)) continue; edges.set(e.source + '>' + e.target, e); if (!keep.has(o)) { keep.add(o); nx.push(o); } } fr = nx; } };
+  build(2); if (keep.size > 22) build(1);
+  const els = [...keep].map(k => { const d = G.nodes.get(k), p = TPAL[d.type] || GREY; return {data: {...d, text: nlabel(d), bg: p[0], bd: p[1], root: k === id ? 1 : 0}}; })
+    .concat([...edges.values()].filter(e => keep.has(e.source) && keep.has(e.target)).map(e => ({data: {id: e.source + '>' + e.target, source: e.source, target: e.target}})));
+  draw(els, true); $('#glegend').hidden = true; $('#dirSeg').hidden = false; $('#btnAll').hidden = false; document.querySelectorAll('#dirSeg button').forEach(b => b.classList.toggle('active', b.dataset.dir === dir));
+  const root = G.nodes.get(id); $('#gsearch').value = root.full || ''; $('#dirSeg').dataset.root = id;
+  const words = wbData.semantics?.lineage?.[id], formula = (G.inE.get(id) || [])[0]?.context;
+  $('#gcard').innerHTML = `<div class="ct">${esc(nlabel(root).replace('\n', ' '))}</div>${words ? `<p>${esc(words)}</p>` : formula ? `<div class="mono f">${esc(formula.slice(0, 130))}</div>` : ''}${keep.size > 1 ? '' : `<div class="hint">${dir === 'up' ? 'Raw input. Nothing feeds it.' : 'Nothing reads it.'}</div>`}`; $('#gcard').hidden = false; refit(); }
+$('#gsearch').addEventListener('change', () => { const q = $('#gsearch').value.trim().toLowerCase(); if (!G) return; if (!q) return showOverview();
+  const all = [...G.nodes.values()].filter(d => G.inE.has(d.id) || G.outE.has(d.id)).sort((a, b) => (G.inE.has(b.id) ? 1 : 0) - (G.inE.has(a.id) ? 1 : 0));
+  const m = all.find(d => (d.full || '').toLowerCase() === q) || all.find(d => (d.full || '').toLowerCase().includes(q)); if (m) traceNode(m.id, G.inE.has(m.id) ? 'up' : 'down'); else toast('Nothing matches', true); });
+document.querySelectorAll('#dirSeg button').forEach(b => b.onclick = () => traceNode($('#dirSeg').dataset.root, b.dataset.dir));
+$('#btnAll').onclick = showOverview; $('#btnFit').onclick = fit;
+
+/* ---------- ask */
+const SUGG = ['Where does gross margin come from?', 'What breaks if rows are added to Actuals?', 'Do our files agree on gross margin?'];
+$('#sugg').innerHTML = SUGG.map(s => `<button>${esc(s)}</button>`).join(''); $('#sugg').querySelectorAll('button').forEach(b => b.onclick = () => send(b.textContent));
+function cites(html, chunks){ return html.replace(/\[([^\[\]\n<>]{1,120})\]/g, (m, inner) => { const num = /^\d{1,2}$/.test(inner); const i = num ? +inner - 1 : chunks.findIndex(c => c.id === inner); if (i < 0 || i >= chunks.length) return num ? `<span class="cite">${inner}</span>` : m; return `<span class="cite" title="${esc((chunks[i].text || '').slice(0, 260))}">${i + 1}</span>`; }); }
+function addMsg(kind, html){ const el = document.createElement('div'); el.className = 'msg ' + kind; el.innerHTML = `<div class="bubble">${html}</div>`; $('#chat').appendChild(el); el.scrollIntoView({behavior:'smooth', block:'end'}); return el; }
+async function send(q){ q = (q || '').trim(); if (!q) return; $('#sugg').hidden = true; addMsg('user', esc(q)); $('#q').value = ''; const pending = addMsg('brain', '<span class="spin"></span>'); $('#btnAsk').disabled = true;
+  try { const r = await api('/api/ask', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question: q, persona: PERSONA, graph: true})});
+    pending.querySelector('.bubble').innerHTML = cites(marked.parse(r.answer || ''), r.chunks) + (r.chunks.length ? `<details class="srcd"><summary>${r.chunks.length} sources</summary><ol>${r.chunks.map(c => `<li>${esc(c.text.slice(0, 240))}${c.text.length > 240 ? '…' : ''}</li>`).join('')}</ol></details>` : '');
+  } catch (e) { pending.querySelector('.bubble').innerHTML = `<span style="color:var(--critical)">${esc(e.message)}</span>`; }
+  $('#btnAsk').disabled = false; pending.scrollIntoView({behavior:'smooth', block:'end'}); }
+$('#btnAsk').onclick = () => send($('#q').value); $('#q').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send($('#q').value); } };
+$('#lnkTeach').onclick = () => { $('#teach').hidden = !$('#teach').hidden; $('#mem').focus(); };
+$('#btnMem').onclick = async () => { const t = $('#mem').value.trim(); if (!t) return; try { await api('/api/remember', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({persona: PERSONA, text: t})}); $('#mem').value = ''; $('#teach').hidden = true; toast('Saved'); } catch (e) { toast(e.message, true); } };
+$('#mem').onkeydown = e => { if (e.key === 'Enter') $('#btnMem').click(); };
+
+/* ---------- sql */
+$('#btnSql').onclick = async () => { $('#sqlStatus').innerHTML = '<span class="spin"></span>'; try { const r = await api('/api/sql?q=' + encodeURIComponent($('#sql').value)); $('#sqlOut').innerHTML = `<div class="card" style="padding:6px 10px">${rowsTable(r.columns, r.rows)}</div>`; $('#sqlStatus').textContent = `${r.rows.length} rows`; } catch (e) { $('#sqlOut').innerHTML = ''; $('#sqlStatus').innerHTML = `<span style="color:var(--critical)">${esc(e.message)}</span>`; } };
+async function loadTables(){ const ts = await api('/api/sql/tables'); $('#sqlTables').innerHTML = ts.map(t => `<button data-t="${esc(t.table)}">${esc(t.table.split('__').slice(1).join(' · ') || t.table)}</button>`).join(''); $('#sqlTables').querySelectorAll('button').forEach(b => b.onclick = () => { $('#sql').value = `select * from ${b.dataset.t} limit 50`; $('#btnSql').click(); }); }
+
+/* ---------- boot */
+refreshAll().then(async () => { const h = location.hash.replace('#', ''), sp = new URLSearchParams(location.search); if (h) openTab(h);
+  if (sp.get('trace')) { openTab('lineage'); await ensureGraph(); $('#gsearch').value = sp.get('trace'); $('#gsearch').dispatchEvent(new Event('change')); }
+  if (sp.get('table') && wbData) { const t = wbData.tables.find(x => x.id === sp.get('table')); if (t) openTable(t); }
+  if (sp.get('q')) { openTab('ask'); send(sp.get('q')); } });
+window.addEventListener('hashchange', () => openTab(location.hash.replace('#', '')));
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# private planning notes and personal files stay local
+BUILD_PLAN.md
+*.pdf
+.DS_Store
+
+# secrets and generated state
+.env
+finance-brain/out/
+finance-brain/uploads/
+.venv/
+__pycache__/
+.pytest_cache/
+*.duckdb
+~$*.xlsx
