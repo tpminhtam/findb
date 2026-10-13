@@ -75,6 +75,11 @@ def process(path: Path, enrich: bool = False) -> dict:
     out.mkdir(parents=True, exist_ok=True)
     sem = None
     sem_error = None
+    if not enrich and (out / "semantics.json").exists():     # keep earlier Claude descriptions when a file is dropped again
+        try:
+            sem = json.loads((out / "semantics.json").read_text())
+        except Exception:
+            sem = None
     if enrich:
         try:
             from .semantics import enrich as _enrich
@@ -263,7 +268,10 @@ def ddl(slug: str):
 def delete(slug: str):
     if slug not in local.captures:
         raise HTTPException(404, "unknown workbook")
-    shutil.rmtree(OUT / slug, ignore_errors=True)
+    folder = OUT / slug                                      # remove the capture but keep semantics.json for a later re-drop
+    for f in ("capture.json", "ddl.sql"):
+        (folder / f).unlink(missing_ok=True)
+    shutil.rmtree(folder / "cards", ignore_errors=True)
     local.captures.pop(slug, None); local.semantics.pop(slug, None); local.rebuild()
     return {"deleted": slug}
 
